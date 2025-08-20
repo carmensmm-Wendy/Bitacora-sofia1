@@ -11,18 +11,30 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # ID de tu hoja
 
 # ================== CREDENCIALES ==================
-# Ruta del archivo secreto en Render
-cred_file_path = "/etc/secrets/google-credentials.json"
+def cargar_credenciales():
+    # 1) Archivo secreto en Render
+    cred_file_path = "/etc/secrets/google-credentials.json"
+    if os.path.exists(cred_file_path):
+        return Credentials.from_service_account_file(cred_file_path, scopes=SCOPES)
 
-if os.path.exists(cred_file_path):
-    creds = Credentials.from_service_account_file(cred_file_path, scopes=SCOPES)
-elif os.getenv("GOOGLE_CREDENTIALS"):
-    creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-elif os.path.exists("credentials.json"):
-    creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
-else:
+    # 2) Variable de entorno GOOGLE_CREDENTIALS
+    google_creds_env = os.getenv("GOOGLE_CREDENTIALS")
+    if google_creds_env:
+        try:
+            creds_dict = json.loads(google_creds_env)
+            return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        except json.JSONDecodeError:
+            raise Exception("❌ La variable de entorno GOOGLE_CREDENTIALS no contiene un JSON válido")
+
+    # 3) Archivo local credentials.json
+    local_file = "credentials.json"
+    if os.path.exists(local_file):
+        return Credentials.from_service_account_file(local_file, scopes=SCOPES)
+
+    # 4) Si nada funciona
     raise Exception("❌ No se encontró el archivo de credenciales ni la variable de entorno GOOGLE_CREDENTIALS")
+
+creds = cargar_credenciales()
 
 # Crea la app de Flask
 app = Flask(__name__)
@@ -134,6 +146,5 @@ def create_today():
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-    # Esto solo se usa en local. En Render se usará Gunicorn.
+    # Solo se usa en local. En Render se usará Gunicorn.
     app.run(debug=True, host="0.0.0.0", port=5000)
-
