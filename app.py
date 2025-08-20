@@ -3,33 +3,26 @@ from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
-import json
 import re
+import json
 
 # ================== CONFIG ==================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-<<<<<<< HEAD
-SPREADSHEET_ID = "1OzbbXYOoJbco7pM21ook6BSFs-gztSFocZBTip-D3KA"
+SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # ID de tu hoja
 
-# Leer credenciales desde variable de entorno o archivo local
-creds_json = os.getenv("GOOGLE_CREDENTIALS")
+# ================== CREDENCIALES ==================
+# Ruta del archivo secreto en Render
+cred_file_path = "/etc/secrets/google-credentials.json"
 
-if creds_json:
-    # Render → lee desde variable de entorno
-    creds_dict = json.loads(creds_json)
+if os.path.exists(cred_file_path):
+    creds = Credentials.from_service_account_file(cred_file_path, scopes=SCOPES)
+elif os.getenv("GOOGLE_CREDENTIALS"):
+    creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-else:
-    # Local → usa el archivo credentials.json
-    if not os.path.exists("credentials.json"):
-        raise Exception("❌ No se encontró GOOGLE_CREDENTIALS ni el archivo credentials.json")
+elif os.path.exists("credentials.json"):
     creds = Credentials.from_service_account_file("credentials.json", scopes=SCOPES)
-=======
-SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # <-- ID de la hoja de tu hermano
-
-# Leer credenciales desde variable de entorno
-creds_dict = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
->>>>>>> 1c874ed (Primer commit proyecto Bitácora Sofía)
+else:
+    raise Exception("❌ No se encontró el archivo de credenciales ni la variable de entorno GOOGLE_CREDENTIALS")
 
 # Crea la app de Flask
 app = Flask(__name__)
@@ -39,7 +32,7 @@ service = build("sheets", "v4", credentials=creds)
 
 # ================== HELPERS ==================
 def obtener_ultima_hoja():
-    """ Devuelve el título de la última hoja con formato YYYY-MM-DD. """
+    """Devuelve el título de la última hoja con formato YYYY-MM-DD."""
     spreadsheet = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     sheets = spreadsheet.get("sheets", [])
     fechas = []
@@ -141,10 +134,6 @@ def create_today():
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-<<<<<<< HEAD
     # Esto solo se usa en local. En Render se usará Gunicorn.
     app.run(debug=True, host="0.0.0.0", port=5000)
 
-=======
-    app.run(debug=True, host="0.0.0.0", port=5000)
->>>>>>> 1c874ed (Primer commit proyecto Bitácora Sofía)
