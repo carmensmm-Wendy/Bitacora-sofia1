@@ -3,38 +3,23 @@ from googleapiclient.discovery import build
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
-import re
 import json
+import re
 
 # ================== CONFIG ==================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # ID de tu hoja
+SPREADSHEET_ID = "1OzbbXYOoJbco7pM21ook6BSFs-gztSFocZBTip-D3KA"
 
 # ================== CREDENCIALES ==================
-def cargar_credenciales():
-    # 1) Archivo secreto en Render
-    cred_file_path = "/etc/secrets/google-credentials.json"
-    if os.path.exists(cred_file_path):
-        return Credentials.from_service_account_file(cred_file_path, scopes=SCOPES)
+google_creds_env = os.getenv("GOOGLE_CREDENTIALS")
+if not google_creds_env:
+    raise Exception("❌ No se encontró la variable de entorno GOOGLE_CREDENTIALS")
 
-    # 2) Variable de entorno GOOGLE_CREDENTIALS
-    google_creds_env = os.getenv("GOOGLE_CREDENTIALS")
-    if google_creds_env:
-        try:
-            creds_dict = json.loads(google_creds_env)
-            return Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-        except json.JSONDecodeError:
-            raise Exception("❌ La variable de entorno GOOGLE_CREDENTIALS no contiene un JSON válido")
-
-    # 3) Archivo local credentials.json
-    local_file = "credentials.json"
-    if os.path.exists(local_file):
-        return Credentials.from_service_account_file(local_file, scopes=SCOPES)
-
-    # 4) Si nada funciona
-    raise Exception("❌ No se encontró el archivo de credenciales ni la variable de entorno GOOGLE_CREDENTIALS")
-
-creds = cargar_credenciales()
+try:
+    creds_dict = json.loads(google_creds_env)
+    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+except json.JSONDecodeError:
+    raise Exception("❌ La variable de entorno GOOGLE_CREDENTIALS no contiene un JSON válido")
 
 # Crea la app de Flask
 app = Flask(__name__)
@@ -47,15 +32,8 @@ def obtener_ultima_hoja():
     """Devuelve el título de la última hoja con formato YYYY-MM-DD."""
     spreadsheet = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     sheets = spreadsheet.get("sheets", [])
-    fechas = []
-    for s in sheets:
-        title = s["properties"]["title"]
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", title):
-            fechas.append(title)
-    if not fechas:
-        return None
-    fechas.sort(reverse=True)
-    return fechas[0]
+    fechas = [s["properties"]["title"] for s in sheets if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s["properties"]["title"])]
+    return max(fechas) if fechas else None
 
 # ================== ROUTES ==================
 @app.route("/")
@@ -72,13 +50,13 @@ def create_today():
     if not ultima_hoja:
         return jsonify({"error": "No existe ninguna hoja anterior con datos."}), 400
 
-    # 1) Crear nueva hoja
-    requests = [{"addSheet": {"properties": {"title": hoy}}}]
+    # Crear nueva hoja
     service.spreadsheets().batchUpdate(
-        spreadsheetId=SPREADSHEET_ID, body={"requests": requests}
+        spreadsheetId=SPREADSHEET_ID,
+        body={"requests": [{"addSheet": {"properties": {"title": hoy}}}]}
     ).execute()
 
-    # 2) Copiar encabezados (A-G)
+    # Copiar encabezados
     encabezados = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID, range=f"{ultima_hoja}!A1:G1"
     ).execute().get("values", [])
@@ -91,26 +69,17 @@ def create_today():
             body={"values": encabezados}
         ).execute()
 
-    # 3) Copiar base (A y B) dejando C, D, E vacías
-    result = service.spreadsheets().values().get(
+    # Copiar base A-B dejando C,D,E vacías
+    values = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID, range=f"{ultima_hoja}!A2:B"
-    ).execute()
-    values = result.get("values", [])
+    ).execute().get("values", [])
 
-    nueva_data = []   # A..E
-    formulas_f = []  # F
-    formulas_g = []  # G
-    fila_excel = 2   # empezamos en la fila 2
+    nueva_data, formulas_f, formulas_g = [], [], []
+    fila_excel = 2
 
     for fila in values:
         if len(fila) >= 2:
-            nueva_data.append([
-                hoy,      # A: fecha nueva
-                fila[1],  # B: cliente
-                "",       # C: préstamo
-                "",       # D: interés
-                ""        # E: abono
-            ])
+            nueva_data.append([hoy, fila[1], "", "", ""])
             formulas_f.append([f"='{ultima_hoja}'!F{fila_excel} + C{fila_excel}*(1+D{fila_excel}/100) - E{fila_excel}"])
             if mes_actual == ultima_hoja[:7]:
                 formulas_g.append([f"='{ultima_hoja}'!G{fila_excel} + C{fila_excel}"])
@@ -120,31 +89,25 @@ def create_today():
 
     if nueva_data:
         service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{hoy}!A2",
-            valueInputOption="USER_ENTERED",
-            body={"values": nueva_data}
+            spreadsheetId=SPREADSHEET_ID, range=f"{hoy}!A2",
+            valueInputOption="USER_ENTERED", body={"values": nueva_data}
         ).execute()
 
     if formulas_f:
         service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{hoy}!F2",
-            valueInputOption="USER_ENTERED",
-            body={"values": formulas_f}
+            spreadsheetId=SPREADSHEET_ID, range=f"{hoy}!F2",
+            valueInputOption="USER_ENTERED", body={"values": formulas_f}
         ).execute()
 
     if formulas_g:
         service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{hoy}!G2",
-            valueInputOption="USER_ENTERED",
-            body={"values": formulas_g}
+            spreadsheetId=SPREADSHEET_ID, range=f"{hoy}!G2",
+            valueInputOption="USER_ENTERED", body={"values": formulas_g}
         ).execute()
 
     return redirect(url_for("index"))
 
 # ================== MAIN ==================
 if __name__ == "__main__":
-    # Solo se usa en local. En Render se usará Gunicorn.
+    # Render usará Gunicorn, esto solo sirve localmente
     app.run(debug=True, host="0.0.0.0", port=5000)
