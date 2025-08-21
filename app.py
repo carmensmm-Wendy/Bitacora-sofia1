@@ -8,7 +8,7 @@ import re
 
 # ================== CONFIG ==================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1OzbbXYOoJbco7pM21ook6BSFs-gztSFocZBTip-D3KA"
+SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # <-- ID actualizado
 
 # ================== CREDENCIALES ==================
 google_creds_env = os.getenv("GOOGLE_CREDENTIALS")
@@ -63,10 +63,8 @@ def create_today():
 
     if encabezados:
         service.spreadsheets().values().update(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"{hoy}!A1",
-            valueInputOption="USER_ENTERED",
-            body={"values": encabezados}
+            spreadsheetId=SPREADSHEET_ID, range=f"{hoy}!A1",
+            valueInputOption="USER_ENTERED", body={"values": encabezados}
         ).execute()
 
     # Copiar base A-B dejando C,D,E vacías
@@ -111,3 +109,4 @@ def create_today():
 if __name__ == "__main__":
     # Render usará Gunicorn, esto solo sirve localmente
     app.run(debug=True, host="0.0.0.0", port=5000)
+
