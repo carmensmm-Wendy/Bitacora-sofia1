@@ -52,10 +52,11 @@ def index():
 def create_today():
     hoy = datetime.today().strftime("%Y-%m-%d")
     ultima_hoja = obtener_ultima_hoja()
+    
     if not ultima_hoja:
-        return jsonify({"error": "No existe ninguna hoja anterior con datos."}), 400
+        return jsonify({"error": "No se detectó ninguna hoja anterior con datos."}), 400
 
-    # 1) Crear nueva hoja
+    # 1️⃣ Crear nueva hoja con la fecha de hoy
     try:
         service.spreadsheets().batchUpdate(
             spreadsheetId=SPREADSHEET_ID,
@@ -64,10 +65,12 @@ def create_today():
     except Exception as e:
         return jsonify({"error": f"Error al crear la hoja: {str(e)}"}), 500
 
-    # 2) Copiar encabezados
+    # 2️⃣ Copiar encabezados (A-H)
     encabezados = service.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID, range=f"{ultima_hoja}!A1:H1"
+        spreadsheetId=SPREADSHEET_ID,
+        range=f"{ultima_hoja}!A1:H1"
     ).execute().get("values", [])
+    
     if encabezados:
         service.spreadsheets().values().update(
             spreadsheetId=SPREADSHEET_ID,
@@ -76,7 +79,7 @@ def create_today():
             body={"values": encabezados}
         ).execute()
 
-    # 3) Copiar datos de productos
+    # 3️⃣ Copiar datos de productos
     result = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID, range=f"{ultima_hoja}!B2:H"
     ).execute()
@@ -88,19 +91,19 @@ def create_today():
         valor_unit = fila[1] if len(fila) >= 2 else ""
         utilidad = fila[2] if len(fila) >= 3 else ""
         total_valor = ""
-        unidades_vendidas = fila[4] if len(fila) >= 5 else 0  # se pone 0 si no hay ventas
+        unidades_vendidas = fila[4] if len(fila) >= 5 else 0
         unidades_restantes = fila[5] if len(fila) >= 6 else 0
         inventario_inicial = fila[6] if len(fila) >= 7 else 0
 
         nueva_data.append([
-            hoy,              # A
-            producto,         # B
-            valor_unit,       # C
-            utilidad,         # D
-            total_valor,      # E
-            unidades_vendidas,# F
-            unidades_restantes,# G
-            inventario_inicial # H
+            hoy,               # A: fecha
+            producto,          # B: producto
+            valor_unit,        # C: valor unitario
+            utilidad,          # D: % utilidad
+            total_valor,       # E: total valor (fórmula)
+            unidades_vendidas, # F: unidades vendidas
+            unidades_restantes,# G: unidades restantes
+            inventario_inicial # H: inventario inicial
         ])
 
     if nueva_data:
@@ -111,7 +114,7 @@ def create_today():
             body={"values": nueva_data}
         ).execute()
 
-    # 4) Aplicar fórmulas seguras
+    # 4️⃣ Aplicar fórmulas seguras
     fila_final = len(nueva_data) + 1
     formulas_total_valor = [[f"=IF(F{idx}=\"\",0,C{idx}*(1+D{idx}/100)*F{idx})"] for idx in range(2, fila_final+1)]
     formulas_unidades_restantes = [[f"=IF(H{idx}=\"\",0,H{idx})-IF(F{idx}=\"\",0,F{idx})"] for idx in range(2, fila_final+1)]
