@@ -77,7 +77,7 @@ def create_today():
             body={"values": encabezados}
         ).execute()
 
-    # 3) Copiar datos de productos (B-H) y preparar fórmulas
+    # 3) Copiar datos de productos (B-H) y preparar nuevas filas
     result = service.spreadsheets().values().get(
         spreadsheetId=SPREADSHEET_ID, range=f"{ultima_hoja}!B2:H"
     ).execute()
@@ -99,9 +99,9 @@ def create_today():
             producto,      # B: producto
             valor_unit,    # C: valor unitario
             utilidad,      # D: porcentaje utilidad
-            total_valor,   # E: total valor (fórmula se pondrá luego)
+            total_valor,   # E: total valor (fórmula luego)
             unidades_vendidas,  # F: unidades vendidas
-            unidades_restantes, # G: unidades restantes
+            unidades_restantes, # G: unidades restantes (fórmula luego)
             inventario_inicial  # H: inventario inicial
         ])
         fila_excel += 1
@@ -114,9 +114,15 @@ def create_today():
             body={"values": nueva_data}
         ).execute()
 
-    # 4) Aplicar fórmulas en E (total valor) y G (unidades restantes)
-    formulas_total_valor = [[f"=C{idx}*(1+D{idx}/100)*F{idx}"] for idx in range(2, fila_excel)]
-    formulas_unidades_restantes = [[f"=H{idx}-F{idx}"] for idx in range(2, fila_excel)]
+    # 4) Aplicar fórmulas
+    formulas_total_valor = [
+        [f"=IF(F{idx}=\"\",0,C{idx}*(1+D{idx}/100)*F{idx})"]
+        for idx in range(2, fila_excel)
+    ]
+    formulas_unidades_restantes = [
+        [f"=IF(F{idx}=\"\",H{idx},H{idx}-F{idx})"]
+        for idx in range(2, fila_excel)
+    ]
 
     if formulas_total_valor:
         service.spreadsheets().values().update(
@@ -139,5 +145,4 @@ def create_today():
 # ================== MAIN ==================
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-
 
