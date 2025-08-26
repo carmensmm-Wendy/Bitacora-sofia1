@@ -8,7 +8,7 @@ import re
 
 # ================== CONFIG ==================
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-SPREADSHEET_ID = "1rYqx_j6FxJcx0txntZ5cE5LjQoE3jS9Dg6yFi5Dn50Y"  # Tu Google Sheet
+SPREADSHEET_ID = "1SDgZRJJZtpFIbinH8A85BIPM1y7sr4LbYbSkwcQ7QRE"  # Tu Google Sheet
 
 # ================== CREDENCIALES ==================
 def cargar_credenciales():
@@ -149,5 +149,3 @@ def create_today():
 # ================== MAIN ==================
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
-
-
